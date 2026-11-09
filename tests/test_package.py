@@ -95,6 +95,8 @@ class PackageContractTests(unittest.TestCase):
     def test_launcher_preserves_existing_workflow_and_has_backup_restore(self):
         module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
         self.assertIn("export:workflow', '--all'", module)
+        self.assertIn("No workflows found with specified filters", module)
+        self.assertIn("У новій базі n8n ще немає workflow", module)
         self.assertIn("Наявний workflow збережено без перезапису", module)
         self.assertIn("function Backup-CourseKit", module)
         self.assertIn("function Restore-CourseKitBackup", module)

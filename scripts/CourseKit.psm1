@@ -749,7 +749,12 @@ function Start-CourseKit {
     $workflowIsPublished = $false
     $workflowExport = Join-Path $configuration.Paths.Import 'existing-workflows.json'
     try {
-        Invoke-CourseCompose -Arguments @('run', '--rm', '--no-deps', 'n8n', 'export:workflow', '--all', '--output=/coursekit/import/existing-workflows.json') -TimeoutSeconds 420 | Out-Null
+        try {
+            Invoke-CourseCompose -Arguments @('run', '--rm', '--no-deps', 'n8n', 'export:workflow', '--all', '--output=/coursekit/import/existing-workflows.json') -TimeoutSeconds 420 | Out-Null
+        } catch {
+            if ($_.Exception.Message -notmatch 'No workflows found with specified filters') { throw }
+            Write-CourseLog 'У новій базі n8n ще немає workflow; створюю навчальний workflow.'
+        }
         if (Test-Path -LiteralPath $workflowExport) {
             $existingWorkflows = @(Get-Content -LiteralPath $workflowExport -Raw -Encoding UTF8 | ConvertFrom-Json)
             $existingWorkflow = @($existingWorkflows | Where-Object { $_.id -eq 'telegramCourseMvp' } | Select-Object -First 1)
