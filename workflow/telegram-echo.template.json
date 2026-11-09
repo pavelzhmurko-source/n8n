@@ -1,0 +1,72 @@
+[
+  {
+    "id": "telegramCourseMvp",
+    "name": "Telegram Course — Echo",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "telegram-course",
+          "responseMode": "onReceived",
+          "options": {}
+        },
+        "id": "98fe4546-00af-49d5-964a-3fe1b1022932",
+        "name": "Telegram webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [260, 300],
+        "webhookId": "eb167f39-d019-43a6-ac15-35a70235a7d0"
+      },
+      {
+        "parameters": {
+          "jsCode": "__GUARD_CODE__"
+        },
+        "id": "da75ba70-800c-49f4-83a1-7558681f456a",
+        "name": "Validate and deduplicate",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [500, 300]
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $json.chatId }}",
+          "text": "={{ $json.replyText }}",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "id": "009013a0-1b76-4bff-8ebd-7dc4bdfde1a4",
+        "name": "Send Telegram response",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [760, 300],
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000,
+        "credentials": {
+          "telegramApi": {
+            "id": "telegram-course-bot",
+            "name": "Telegram Course Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Telegram webhook": {
+        "main": [[{"node": "Validate and deduplicate", "type": "main", "index": 0}]]
+      },
+      "Validate and deduplicate": {
+        "main": [[{"node": "Send Telegram response", "type": "main", "index": 0}]]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "tags": []
+  }
+]

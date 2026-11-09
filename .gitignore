@@ -1,0 +1,26 @@
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+.runtime/
+*.local.json
+*.secret
+*.secrets.json
+
+# n8n state, logs, and backups
+.n8n/
+data/
+logs/
+backups/
+*.sqlite
+*.sqlite-*
+
+# Test and language caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Windows
+Thumbs.db
+Desktop.ini
