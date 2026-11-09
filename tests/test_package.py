@@ -101,6 +101,14 @@ class PackageContractTests(unittest.TestCase):
         self.assertIn("Windows DPAPI CurrentUser", module)
         self.assertIn("$matches[$matches.Count - 1].Value", module)
 
+    def test_process_exit_code_is_refreshed_for_windows_powershell(self):
+        module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
+        wait = module.index("$process.WaitForExit()")
+        refresh = module.index("$process.Refresh()", wait)
+        exit_code = module.index("$exitCode = $process.ExitCode", refresh)
+        self.assertLess(wait, refresh)
+        self.assertLess(refresh, exit_code)
+
     def test_compose_configuration_resolves(self):
         if not shutil_which("docker"):
             self.skipTest("Docker is not installed")

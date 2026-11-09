@@ -225,14 +225,21 @@ function Invoke-CourseProcess {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
             throw "$FilePath не завершився за $TimeoutSeconds секунд."
         }
+        # Windows PowerShell 5.1 can leave the Process wrapper stale after the
+        # timed WaitForExit overload, especially when stdout/stderr are redirected.
+        # The parameterless wait flushes redirected streams and Refresh populates
+        # ExitCode before it is inspected.
+        $process.WaitForExit()
+        $process.Refresh()
+        $exitCode = $process.ExitCode
         $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw -Encoding UTF8 } else { '' }
         $stderr = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw -Encoding UTF8 } else { '' }
-        if ($process.ExitCode -ne 0) {
+        if ($exitCode -ne 0) {
             $detail = ($stderr + "`n" + $stdout).Trim()
             if ($detail.Length -gt 1200) { $detail = $detail.Substring($detail.Length - 1200) }
-            throw "$FilePath завершився з кодом $($process.ExitCode): $detail"
+            throw "$FilePath завершився з кодом ${exitCode}: $detail"
         }
-        return [pscustomobject]@{ StdOut = $stdout; StdErr = $stderr; ExitCode = $process.ExitCode }
+        return [pscustomobject]@{ StdOut = $stdout; StdErr = $stderr; ExitCode = $exitCode }
     } finally {
         Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
