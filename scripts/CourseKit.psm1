@@ -647,11 +647,11 @@ function Restore-CourseKitBackup {
         Expand-CourseVolumeArchive -Volume $stageVolume -Directory $temporary
         Test-CourseVolumeDatabase -Volume $stageVolume
 
-        $running = Get-CourseProjectContainerIds -RunningOnly
+        $running = @(Get-CourseProjectContainerIds -RunningOnly)
         if ($running.Count -gt 0) {
             Invoke-CourseProcess -FilePath 'docker.exe' -Arguments (@('stop', '--time', '30') + $running) -TimeoutSeconds 90 | Out-Null
         }
-        $allContainers = Get-CourseProjectContainerIds
+        $allContainers = @(Get-CourseProjectContainerIds)
         if ($allContainers.Count -gt 0) {
             Invoke-CourseProcess -FilePath 'docker.exe' -Arguments (@('rm', '-f') + $allContainers) -TimeoutSeconds 90 | Out-Null
         }
@@ -725,7 +725,7 @@ function Start-CourseKit {
     $bot = Invoke-CourseTelegram -Token $configuration.TelegramToken -Method 'getMe'
     Write-CourseLog ("Telegram-бот доступний: @{0}" -f $bot.username)
 
-    $previousContainers = Get-CourseProjectContainerIds
+    $previousContainers = @(Get-CourseProjectContainerIds)
     if ($previousContainers.Count -gt 0) {
         Write-CourseLog 'Прибираю залишкові контейнери попереднього запуску; дані n8n зберігаються…'
         Invoke-CourseProcess -FilePath 'docker.exe' -Arguments (@('rm', '-f') + $previousContainers) -TimeoutSeconds 120 | Out-Null
@@ -824,7 +824,7 @@ function Start-CourseKit {
     return [pscustomobject]@{ Kind = 'Result'; State = 'Ready'; LocalUrl = "$localUrl/"; PublicUrl = $publicUrl }
     } catch {
         try {
-            $containers = Get-CourseProjectContainerIds
+            $containers = @(Get-CourseProjectContainerIds)
             if ($containers.Count -gt 0) {
                 Invoke-CourseProcess -FilePath 'docker.exe' -Arguments (@('rm', '-f') + $containers) -TimeoutSeconds 90 | Out-Null
             }

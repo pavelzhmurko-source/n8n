@@ -280,6 +280,6 @@ $form.Add_FormClosing({
 })
 
 Refresh-SavedSettings
-Add-LogLine 'Версія пакета: 0.2.4.'
+Add-LogLine 'Версія пакета: 0.2.5.'
 Add-LogLine 'Вікно готове. Для першого запуску збережіть токен і свій Telegram user ID.'
 [void]$form.ShowDialog()

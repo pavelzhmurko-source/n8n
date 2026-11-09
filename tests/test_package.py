@@ -121,9 +121,22 @@ class PackageContractTests(unittest.TestCase):
         module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
         self.assertIn("$security.SetOwner($identity)", module)
         self.assertIn("Remove-Item -LiteralPath $paths.Runtime -Recurse -Force", module)
-        remove_containers = module.index("$previousContainers = Get-CourseProjectContainerIds")
+        remove_containers = module.index("$previousContainers = @(Get-CourseProjectContainerIds)")
         create_runtime = module.index("New-CourseRuntimeFiles -Configuration $configuration", remove_containers)
         self.assertLess(remove_containers, create_runtime)
+
+    def test_container_id_results_are_always_treated_as_arrays(self):
+        module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
+        assignments = re.findall(
+            r"\$(previousContainers|containers|running|allContainers)\s*=\s*([^\r\n]*Get-CourseProjectContainerIds[^\r\n]*)",
+            module,
+        )
+        self.assertGreaterEqual(len(assignments), 4)
+        for name, expression in assignments:
+            self.assertTrue(
+                expression.strip().startswith("@(Get-CourseProjectContainerIds"),
+                f"${name} may become a scalar when exactly one container exists",
+            )
 
     def test_compose_configuration_resolves(self):
         if not shutil_which("docker"):
