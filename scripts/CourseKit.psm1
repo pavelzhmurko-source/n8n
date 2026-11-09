@@ -45,6 +45,7 @@ function Set-PrivateDirectoryAcl {
     try {
         $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
         $security = New-Object System.Security.AccessControl.DirectorySecurity
+        $security.SetOwner($identity)
         $security.SetAccessRuleProtection($true, $false)
         $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
         $inheritance = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
@@ -343,9 +344,19 @@ function Get-CourseProjectContainerIds {
 function New-CourseRuntimeFiles {
     param([Parameter(Mandatory)]$Configuration)
     $paths = $Configuration.Paths
+    if (Test-Path -LiteralPath $paths.Runtime) {
+        for ($attempt = 1; $attempt -le 10; $attempt++) {
+            Remove-Item -LiteralPath $paths.Runtime -Recurse -Force -ErrorAction SilentlyContinue
+            if (-not (Test-Path -LiteralPath $paths.Runtime)) { break }
+            Start-Sleep -Milliseconds 300
+        }
+        if (Test-Path -LiteralPath $paths.Runtime) {
+            throw "Не вдалося очистити тимчасову папку $($paths.Runtime). Закрийте вікна Провідника в цій папці та повторіть запуск."
+        }
+    }
     [System.IO.Directory]::CreateDirectory($paths.Runtime) | Out-Null
-    [System.IO.Directory]::CreateDirectory($paths.Import) | Out-Null
     Set-PrivateDirectoryAcl -Path $paths.Runtime
+    [System.IO.Directory]::CreateDirectory($paths.Import) | Out-Null
 
     $nginxTemplate = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'config/nginx/coursekit.conf.template') -Raw -Encoding UTF8
     if ($Configuration.WebhookSecret -notmatch '^[A-Za-z0-9_-]{1,256}$') {
@@ -714,6 +725,11 @@ function Start-CourseKit {
     $bot = Invoke-CourseTelegram -Token $configuration.TelegramToken -Method 'getMe'
     Write-CourseLog ("Telegram-бот доступний: @{0}" -f $bot.username)
 
+    $previousContainers = Get-CourseProjectContainerIds
+    if ($previousContainers.Count -gt 0) {
+        Write-CourseLog 'Прибираю залишкові контейнери попереднього запуску; дані n8n зберігаються…'
+        Invoke-CourseProcess -FilePath 'docker.exe' -Arguments (@('rm', '-f') + $previousContainers) -TimeoutSeconds 120 | Out-Null
+    }
     New-CourseRuntimeFiles -Configuration $configuration
     Set-CourseComposeEnvironment -Configuration $configuration
     Write-CourseLog 'Запускаю локальний n8n і захисний proxy… Перший запуск завантажує великі Docker-образи й може тривати до 30 хвилин.'
