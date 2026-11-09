@@ -213,27 +213,36 @@ function Invoke-CourseProcess {
         [Parameter(Mandatory)][string[]]$Arguments,
         [int]$TimeoutSeconds = 360
     )
-    $paths = Get-CourseKitPaths
-    [System.IO.Directory]::CreateDirectory($paths.Runtime) | Out-Null
-    $stdoutPath = Join-Path $paths.Runtime ("process-{0}.out" -f [Guid]::NewGuid().ToString('N'))
-    $stderrPath = Join-Path $paths.Runtime ("process-{0}.err" -f [Guid]::NewGuid().ToString('N'))
     $argumentLine = ($Arguments | ForEach-Object { ConvertTo-ProcessArgument -Value ([string]$_) }) -join ' '
+    $process = New-Object System.Diagnostics.Process
     try {
-        $process = Start-Process -FilePath $FilePath -ArgumentList $argumentLine -NoNewWindow -PassThru `
-            -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = $argumentLine
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $utf8 = New-Object System.Text.UTF8Encoding($false)
+        $startInfo.StandardOutputEncoding = $utf8
+        $startInfo.StandardErrorEncoding = $utf8
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw "Не вдалося запустити $FilePath."
+        }
+        # Read both streams concurrently so a verbose Docker command cannot
+        # fill one pipe and deadlock while the other pipe is being read.
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            try { $process.Kill() } catch { }
+            $process.WaitForExit()
             throw "$FilePath не завершився за $TimeoutSeconds секунд."
         }
-        # Windows PowerShell 5.1 can leave the Process wrapper stale after the
-        # timed WaitForExit overload, especially when stdout/stderr are redirected.
-        # The parameterless wait flushes redirected streams and Refresh populates
-        # ExitCode before it is inspected.
         $process.WaitForExit()
-        $process.Refresh()
-        $exitCode = $process.ExitCode
-        $stdout = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw -Encoding UTF8 } else { '' }
-        $stderr = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw -Encoding UTF8 } else { '' }
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $exitCode = [int]$process.ExitCode
         if ($exitCode -ne 0) {
             $detail = ($stderr + "`n" + $stdout).Trim()
             if ($detail.Length -gt 1200) { $detail = $detail.Substring($detail.Length - 1200) }
@@ -241,7 +250,7 @@ function Invoke-CourseProcess {
         }
         return [pscustomobject]@{ StdOut = $stdout; StdErr = $stderr; ExitCode = $exitCode }
     } finally {
-        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+        $process.Dispose()
     }
 }
 
