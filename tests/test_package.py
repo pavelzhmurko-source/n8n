@@ -35,6 +35,25 @@ class PackageContractTests(unittest.TestCase):
         missing = [name for name in required if not (ROOT / name).is_file()]
         self.assertEqual(missing, [], f"Missing package files: {missing}")
 
+    def test_windows_powershell_files_have_utf8_bom(self):
+        scripts = [
+            ROOT / "launcher.ps1",
+            ROOT / "scripts/CourseKit.psm1",
+            ROOT / "scripts/backup.ps1",
+            ROOT / "scripts/restore.ps1",
+            ROOT / "tests/run-tests.ps1",
+        ]
+        missing_bom = [
+            str(path.relative_to(ROOT))
+            for path in scripts
+            if not path.read_bytes().startswith(b"\xef\xbb\xbf")
+        ]
+        self.assertEqual(
+            missing_bom,
+            [],
+            f"Windows PowerShell 5.1 requires UTF-8 BOM: {missing_bom}",
+        )
+
     def test_images_are_version_and_digest_pinned(self):
         compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
         images = re.findall(r"^\s*image:\s*(\S+)\s*$", compose, re.MULTILINE)
