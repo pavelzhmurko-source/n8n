@@ -237,7 +237,15 @@ function Invoke-CourseProcess {
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try { $process.Kill() } catch { }
             $process.WaitForExit()
-            throw "$FilePath не завершився за $TimeoutSeconds секунд."
+            $timeoutStdOut = $stdoutTask.GetAwaiter().GetResult()
+            $timeoutStdErr = $stderrTask.GetAwaiter().GetResult()
+            $timeoutDetail = ($timeoutStdErr + "`n" + $timeoutStdOut).Trim()
+            if ($timeoutDetail.Length -gt 1200) {
+                $timeoutDetail = $timeoutDetail.Substring($timeoutDetail.Length - 1200)
+            }
+            $timeoutMessage = "$FilePath не завершився за $TimeoutSeconds секунд."
+            if ($timeoutDetail) { $timeoutMessage += " Останній вивід: $timeoutDetail" }
+            throw $timeoutMessage
         }
         $process.WaitForExit()
         $stdout = $stdoutTask.GetAwaiter().GetResult()
@@ -708,8 +716,8 @@ function Start-CourseKit {
 
     New-CourseRuntimeFiles -Configuration $configuration
     Set-CourseComposeEnvironment -Configuration $configuration
-    Write-CourseLog 'Запускаю локальний n8n і захисний proxy…'
-    Invoke-CourseCompose -Arguments @('up', '-d', 'n8n', 'task-runners', 'proxy') -TimeoutSeconds 420 | Out-Null
+    Write-CourseLog 'Запускаю локальний n8n і захисний proxy… Перший запуск завантажує великі Docker-образи й може тривати до 30 хвилин.'
+    Invoke-CourseCompose -Arguments @('up', '-d', 'n8n', 'task-runners', 'proxy') -TimeoutSeconds 1800 | Out-Null
     $localUrl = "http://127.0.0.1:$($configuration.Settings.n8nPort)"
     Wait-CourseHttp -Url "$localUrl/healthz/readiness" -TimeoutSeconds 300
 

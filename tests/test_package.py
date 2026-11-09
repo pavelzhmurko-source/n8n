@@ -109,6 +109,14 @@ class PackageContractTests(unittest.TestCase):
         self.assertIn("$exitCode = [int]$process.ExitCode", module)
         self.assertNotIn("Start-Process -FilePath $FilePath", module)
 
+    def test_first_compose_start_allows_slow_image_download(self):
+        module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
+        self.assertIn(
+            "@('up', '-d', 'n8n', 'task-runners', 'proxy') -TimeoutSeconds 1800",
+            module,
+        )
+        self.assertIn("Останній вивід", module)
+
     def test_compose_configuration_resolves(self):
         if not shutil_which("docker"):
             self.skipTest("Docker is not installed")
