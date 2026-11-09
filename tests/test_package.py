@@ -92,6 +92,12 @@ class PackageContractTests(unittest.TestCase):
         self.assertTrue(telegram_node["retryOnFail"])
         self.assertEqual(telegram_node["maxTries"], 3)
 
+    def test_windows_generator_preserves_workflow_json_shape(self):
+        module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
+        self.assertIn("$workflowJson.Replace($guardPlaceholder, $guardJson)", module)
+        self.assertIn("Write-Utf8File -Path $paths.Workflow -Content $workflowJson", module)
+        self.assertNotIn("ConvertTo-Json -InputObject $workflows", module)
+
     def test_launcher_preserves_existing_workflow_and_has_backup_restore(self):
         module = (ROOT / "scripts/CourseKit.psm1").read_text(encoding="utf-8")
         self.assertIn("export:workflow', '--all'", module)

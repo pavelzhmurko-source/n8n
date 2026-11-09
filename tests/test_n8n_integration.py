@@ -31,9 +31,12 @@ class N8nBootstrapIntegrationTests(unittest.TestCase):
 
         guard = (ROOT / "workflow/guard.js").read_text(encoding="utf-8")
         guard = guard.replace("__ALLOWED_USER_IDS_JSON__", '["42"]')
-        workflow = json.loads((ROOT / "workflow/telegram-echo.template.json").read_text(encoding="utf-8"))
-        workflow[0]["nodes"][1]["parameters"]["jsCode"] = guard
-        cls.workflow_path.write_text(json.dumps(workflow, ensure_ascii=False), encoding="utf-8")
+        workflow_text = (ROOT / "workflow/telegram-echo.template.json").read_text(encoding="utf-8")
+        workflow_text = workflow_text.replace(
+            '"__GUARD_CODE__"', json.dumps(guard, ensure_ascii=False)
+        )
+        json.loads(workflow_text)
+        cls.workflow_path.write_text(workflow_text, encoding="utf-8")
         credential = [
             {
                 "id": "telegram-course-bot",

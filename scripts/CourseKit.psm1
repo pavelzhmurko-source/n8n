@@ -367,14 +367,32 @@ function New-CourseRuntimeFiles {
     Write-Utf8File -Path $paths.RunnerToken -Content $Configuration.RunnerAuthToken
 
     $guard = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'workflow/guard.js') -Raw -Encoding UTF8
-    $allowedJson = ConvertTo-Json -InputObject @($Configuration.Settings.allowedUserIds | ForEach-Object { [string]$_ }) -Compress
+    $allowedIds = @($Configuration.Settings.allowedUserIds | ForEach-Object { [string]$_ })
+    $allowedJson = '[' + (($allowedIds | ForEach-Object {
+        ConvertTo-Json -InputObject $_ -Compress
+    }) -join ',') + ']'
     $guard = $guard.Replace('__ALLOWED_USER_IDS_JSON__', $allowedJson)
     $templatePath = Join-Path $script:ProjectRoot 'workflow/telegram-echo.template.json'
-    $workflows = @(Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8 | ConvertFrom-Json)
-    $guardNode = $workflows[0].nodes | Where-Object { $_.name -eq 'Validate and deduplicate' }
-    if (-not $guardNode) { throw 'Workflow template does not contain the guard node.' }
-    $guardNode.parameters.jsCode = $guard
-    Write-Utf8File -Path $paths.Workflow -Content (ConvertTo-Json -InputObject $workflows -Depth 100)
+    $workflowJson = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
+    $guardPlaceholder = '"__GUARD_CODE__"'
+    if (([regex]::Matches($workflowJson, [regex]::Escape($guardPlaceholder))).Count -ne 1) {
+        throw 'Workflow template must contain exactly one guard placeholder.'
+    }
+    # Preserve the template's nested arrays byte-for-byte. Windows PowerShell
+    # 5.1 can reshape them when a full workflow is round-tripped through
+    # ConvertFrom-Json/ConvertTo-Json. Only the JavaScript string is serialized.
+    $guardJson = ConvertTo-Json -InputObject $guard -Compress
+    $workflowJson = $workflowJson.Replace($guardPlaceholder, $guardJson)
+    try {
+        $validatedWorkflows = @($workflowJson | ConvertFrom-Json)
+        $guardNode = @($validatedWorkflows[0].nodes | Where-Object { $_.name -eq 'Validate and deduplicate' })
+        if ($guardNode.Count -ne 1 -or [string]::IsNullOrWhiteSpace($guardNode[0].parameters.jsCode)) {
+            throw 'guard node is missing'
+        }
+    } catch {
+        throw "Згенерований workflow має невалідний JSON: $($_.Exception.Message)"
+    }
+    Write-Utf8File -Path $paths.Workflow -Content $workflowJson
 
 }
 
